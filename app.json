@@ -23,6 +23,9 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "plugins": [
+      "expo-notifications"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }
