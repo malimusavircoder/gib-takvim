@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Switch, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { scheduleAllReminders, cancelAllReminders, requestPermissions } from '../utils/notifications';
+import * as Notifications from 'expo-notifications';
+import { scheduleAllReminders, cancelAllReminders, getReminderDays, requestPermissions } from '../utils/notifications';
 import { DEADLINES, Deadline } from '../data/deadlines';
 import { diffDays, formatShortDate, getBadge } from '../utils/dateUtils';
 import { colors, radius, spacing } from '../utils/theme';
@@ -23,23 +24,36 @@ const DEFAULT_PREFS: Prefs = { enabled: true, days7: true, days3: true, days1: f
 export default function NotificationsScreen() {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [selected, setSelected] = useState<Deadline | null>(null);
+  const [permissionState, setPermissionState] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
+  const [canAskAgain, setCanAskAgain] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(PREFS_KEY).then(raw => {
-      if (raw) setPrefs(JSON.parse(raw));
-    });
+    const loadState = async () => {
+      const permissions = await Notifications.getPermissionsAsync();
+      setPermissionState(permissions.granted ? 'granted' : permissions.status === 'denied' ? 'denied' : 'undetermined');
+      setCanAskAgain(permissions.canAskAgain ?? true);
+    };
+
+    const loadPrefs = async () => {
+      const raw = await AsyncStorage.getItem(PREFS_KEY);
+      const nextPrefs = raw ? JSON.parse(raw) as Prefs : DEFAULT_PREFS;
+
+      await loadState();
+      setPrefs(nextPrefs);
+
+      if (nextPrefs.enabled) {
+        await scheduleAllReminders(getReminderDays(nextPrefs), { requestPermission: false });
+      }
+    };
+
+    loadPrefs();
   }, []);
 
   const savePrefs = async (p: Prefs) => {
     setPrefs(p);
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(p));
     if (p.enabled) {
-      const daysList: number[] = [];
-      if (p.days7)    daysList.push(7);
-      if (p.days3)    daysList.push(3);
-      if (p.days1)    daysList.push(1);
-      if (p.sameDay)  daysList.push(0);
-      await scheduleAllReminders(daysList);
+      await scheduleAllReminders(getReminderDays(p));
     } else {
       await cancelAllReminders();
     }
@@ -67,12 +81,15 @@ export default function NotificationsScreen() {
               label="Bildirimleri Aç"
               sub="Beyanname hatırlatmaları"
               value={prefs.enabled}
-              onToggle={() => {
+              onToggle={async () => {
                 if (!prefs.enabled) {
-                  requestPermissions().then(ok => {
-                    if (!ok) Alert.alert('İzin Gerekli', 'Ayarlardan bildirim iznini etkinleştirin.');
-                    else toggle('enabled');
-                  });
+                  const ok = await requestPermissions();
+                  const permissions = await Notifications.getPermissionsAsync();
+                  setPermissionState(permissions.granted ? 'granted' : permissions.status === 'denied' ? 'denied' : 'undetermined');
+                  setCanAskAgain(permissions.canAskAgain ?? true);
+
+                  if (!ok) Alert.alert('İzin Gerekli', 'Ayarlardan bildirim iznini etkinleştirin.');
+                  else toggle('enabled');
                 } else {
                   toggle('enabled');
                 }
@@ -81,16 +98,46 @@ export default function NotificationsScreen() {
           </View>
         </View>
 
+        {prefs.enabled && permissionState !== 'granted' && (
+          <View style={styles.section}>
+            <View style={styles.permissionCard}>
+              <Text style={styles.permissionTitle}>Bildirim izni gerekiyor</Text>
+              <Text style={styles.permissionText}>
+                {canAskAgain
+                  ? 'Hatırlatmaların çalışması için bildirim iznini verin. Aksi halde uygulama açık görünse de uyarılar gelmez.'
+                  : 'Bildirim izni kapalı. Hatırlatmaların çalışması için sistem ayarlarından bu uygulama için bildirimi yeniden açın.'}
+              </Text>
+              <TouchableOpacity
+                style={styles.permissionBtn}
+                onPress={() => {
+                  if (canAskAgain) {
+                    requestPermissions().then(async ok => {
+                      const permissions = await Notifications.getPermissionsAsync();
+                      setPermissionState(permissions.granted ? 'granted' : permissions.status === 'denied' ? 'denied' : 'undetermined');
+                      setCanAskAgain(permissions.canAskAgain ?? true);
+                      if (!ok) Alert.alert('İzin Gerekli', 'Ayarlardan bildirim iznini etkinleştirin.');
+                    });
+                  } else {
+                    Linking.openSettings();
+                  }
+                }}
+              >
+                <Text style={styles.permissionBtnText}>{canAskAgain ? 'İzin İste' : 'Ayarları Aç'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={[styles.section, !prefs.enabled && styles.disabled]}>
           <Text style={styles.sectionLabel}>Ne zaman hatırlat?</Text>
           <View style={styles.card}>
-            <ToggleRow label="7 gün önce" value={prefs.days7}   onToggle={() => toggle('days7')} />
+            <ToggleRow label="7 gün önce" value={prefs.days7}   onToggle={() => prefs.enabled && toggle('days7')} />
             <View style={styles.divider} />
-            <ToggleRow label="3 gün önce" value={prefs.days3}   onToggle={() => toggle('days3')} />
+            <ToggleRow label="3 gün önce" value={prefs.days3}   onToggle={() => prefs.enabled && toggle('days3')} />
             <View style={styles.divider} />
-            <ToggleRow label="1 gün önce" value={prefs.days1}   onToggle={() => toggle('days1')} />
+            <ToggleRow label="1 gün önce" value={prefs.days1}   onToggle={() => prefs.enabled && toggle('days1')} />
             <View style={styles.divider} />
-            <ToggleRow label="Son gün sabahı" value={prefs.sameDay} onToggle={() => toggle('sameDay')} />
+            <ToggleRow label="Son gün sabahı" value={prefs.sameDay} onToggle={() => prefs.enabled && toggle('sameDay')} />
           </View>
         </View>
 
@@ -152,6 +199,11 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   sectionLabel: { fontSize: 11, fontWeight: '600', color: colors.text4, textTransform: 'uppercase', letterSpacing: 0.06, marginBottom: 8, marginTop: spacing.md },
   card: { backgroundColor: colors.bg2, borderRadius: radius.lg, borderWidth: 0.5, borderColor: colors.border, overflow: 'hidden' },
+  permissionCard: { backgroundColor: colors.amberBg, borderRadius: radius.lg, borderWidth: 0.5, borderColor: colors.amber, padding: spacing.lg },
+  permissionTitle: { fontSize: 14, fontWeight: '700', color: colors.amberText },
+  permissionText: { fontSize: 12, lineHeight: 18, color: colors.text2, marginTop: 6 },
+  permissionBtn: { alignSelf: 'flex-start', backgroundColor: colors.amber, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 9, marginTop: spacing.md },
+  permissionBtnText: { fontSize: 12, fontWeight: '700', color: colors.bg0 },
   divider: { height: 0.5, backgroundColor: colors.border, marginHorizontal: spacing.md },
   toggleRow: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, paddingHorizontal: spacing.lg },
   toggleLeft: { flex: 1 },

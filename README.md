@@ -16,6 +16,16 @@ npm install
 npx expo start
 ```
 
+## PDF'den Takvim Üretme
+TÜRMOB PDF dosyasını uygulamaya entegre etmek için:
+
+```bash
+python3 -m pip install --user pypdf
+python3 scripts/generate_deadlines_from_pdf.py --input /Users/murattufan/Desktop/-2026_vergi_takvimi.pdf
+```
+
+Bu komut `src/data/deadlines.ts` dosyasını PDF içeriğinden yeniden üretir.
+
 ## Teknoloji
 
 - React Native / Expo SDK 54

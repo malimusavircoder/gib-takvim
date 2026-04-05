@@ -12,6 +12,16 @@ import { colors, radius, spacing } from '../utils/theme';
 
 const TYPE_OPTIONS = ['KDV', 'Muhtasar', 'Gelir V.', 'Kurumlar V.', 'ÖTV', 'Geçici V.'];
 
+function normalizePhoneForWhatsApp(phone: string): string | null {
+  let digits = phone.replace(/\D/g, '');
+
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('90') && digits.length === 12) digits = digits.slice(2);
+  if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
+
+  return digits.length === 10 ? `90${digits}` : null;
+}
+
 export default function ClientsScreen() {
   const [list, setList] = useState<Mukellef[]>([]);
   const [query, setQuery] = useState('');
@@ -67,8 +77,12 @@ export default function ClientsScreen() {
     if (!selectedMukellef || !selectedDeadline) return;
     const tarih = formatDate(selectedDeadline.date);
     const mesaj = `Sayın ${selectedMukellef.ad}, ${selectedDeadline.title} için son ödeme günü ${tarih}'tir. Bilgilerinize sunarız.`;
-    const tel = selectedMukellef.telefon.replace(/\D/g, '');
-    const url = `https://wa.me/90${tel}?text=${encodeURIComponent(mesaj)}`;
+    const tel = normalizePhoneForWhatsApp(selectedMukellef.telefon);
+    if (!tel) {
+      Alert.alert('Geçersiz Numara', 'WhatsApp için 10 haneli geçerli bir telefon numarası girin.');
+      return;
+    }
+    const url = `https://wa.me/${tel}?text=${encodeURIComponent(mesaj)}`;
     Linking.openURL(url);
     setShowWA(false);
   };

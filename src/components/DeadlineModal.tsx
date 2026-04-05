@@ -14,6 +14,7 @@ export default function DeadlineModal({ item, onClose }: Props) {
   const diff = diffDays(item.date);
   const badge = getBadge(diff);
   const typeStyle = getTypeStyle(item.type);
+  const details = item.items?.length ? item.items : [item.note];
 
   return (
     <Modal visible={!!item} transparent animationType="slide" onRequestClose={onClose}>
@@ -32,8 +33,15 @@ export default function DeadlineModal({ item, onClose }: Props) {
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.date}>{formatDate(item.date)}</Text>
         <View style={styles.divider} />
-        <Text style={styles.noteLabel}>Açıklama</Text>
-        <Text style={styles.note}>{item.note}</Text>
+        <Text style={styles.noteLabel}>Yükümlülükler</Text>
+        <ScrollView style={styles.detailsScroll} showsVerticalScrollIndicator={false}>
+          {details.map((detail, index) => (
+            <View key={`${item.id}-${index}`} style={styles.detailRow}>
+              <Text style={styles.detailBullet}>•</Text>
+              <Text style={styles.note}>{detail}</Text>
+            </View>
+          ))}
+        </ScrollView>
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <Text style={styles.closeBtnText}>Kapat</Text>
         </TouchableOpacity>
@@ -103,6 +111,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginBottom: spacing.md,
   },
+  detailsScroll: {
+    maxHeight: 260,
+    marginBottom: spacing.xl,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  detailBullet: {
+    fontSize: 14,
+    color: colors.text4,
+    lineHeight: 22,
+  },
   noteLabel: {
     fontSize: 11,
     fontWeight: '600',
@@ -112,10 +135,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   note: {
+    flex: 1,
     fontSize: 14,
     color: colors.text2,
     lineHeight: 22,
-    marginBottom: spacing.xl,
   },
   closeBtn: {
     backgroundColor: colors.bg3,
