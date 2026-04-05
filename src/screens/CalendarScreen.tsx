@@ -22,7 +22,7 @@ export default function CalendarScreen() {
   const [filter, setFilter] = useState<'all' | DeadlineType>('all');
   const [selected, setSelected] = useState<Deadline | null>(null);
 
-  const filtered = filter === 'all' ? DEADLINES : DEADLINES.filter(d => d.type === filter);
+  const filtered = filter === 'all' ? DEADLINES : DEADLINES.filter(d => d.types.includes(filter));
 
   const byMonth: Record<number, Deadline[]> = {};
   filtered.forEach(d => {

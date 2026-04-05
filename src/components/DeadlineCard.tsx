@@ -14,6 +14,9 @@ export default function DeadlineCard({ item, onPress }: Props) {
   const badge = getBadge(diff);
   const typeStyle = getTypeStyle(item.type);
   const isPast = diff < 0;
+  const subtitle = item.items.length > 1
+    ? `${formatShortDate(item.date)} · ${item.items.length} yükümlülük`
+    : `${formatShortDate(item.date)} · ${typeStyle.label}`;
 
   return (
     <TouchableOpacity
@@ -24,7 +27,7 @@ export default function DeadlineCard({ item, onPress }: Props) {
       <View style={[styles.dot, { backgroundColor: typeStyle.dotColor }]} />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.date}>{formatShortDate(item.date)} · {typeStyle.label}</Text>
+        <Text style={styles.date}>{subtitle}</Text>
       </View>
       <View style={[styles.badge, { backgroundColor: badge.bgColor }]}>
         <Text style={[styles.badgeText, { color: badge.color }]}>{badge.text}</Text>
